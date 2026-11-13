@@ -7,6 +7,13 @@ const bookings = require("./bookings");
 const { requireKey } = require("./auth");
 const { validateBooking } = require("./validate");
 
+// Level 4: optional Idempotency-Key header (blank counts as absent).
+function idempotencyKey(req) {
+  const key = (req.get("idempotency-key") || "").trim();
+  if (key.length > 255) throw new HttpError(400, "Idempotency-Key is too long");
+  return key || null;
+}
+
 const app = express();
 app.disable("x-powered-by");
 
@@ -26,8 +33,13 @@ app.get("/slots", async (req, res) => {
 
 app.post("/bookings", async (req, res) => {
   const input = validateBooking(req.body);
-  const result = await bookings.createBooking(input);
+  const idemKey = idempotencyKey(req);
+  const result = await bookings.createBooking(input, req.body, idemKey);
   res.status(result.status).json(result.body);
+});
+
+app.get("/bookings", async (req, res) => {
+  res.json(await bookings.listBookings(req.query));
 });
 
 app.get("/bookings/:id", async (req, res) => {

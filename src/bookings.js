@@ -18,11 +18,15 @@ function toBooking(row) {
   };
 }
 
-// POST /bookings (Level 1): book a slot.
+// POST /bookings: book a slot. `input` is already validated and cleaned.
 async function createBooking(input) {
   return tx(async (db) => {
-    const slot = await db.query("SELECT id FROM slots WHERE id = $1", [input.slot_id]);
+    const slot = await db.query(
+      "SELECT start_at <= clock_timestamp() AS started FROM slots WHERE id = $1",
+      [input.slot_id]
+    );
     if (slot.rowCount === 0) throw new HttpError(404, "slot not found");
+    if (slot.rows[0].started) throw new HttpError(400, "slot has already started");
     const { rows } = await db.query(
       `INSERT INTO bookings (id, slot_id, name, email) VALUES ($1, $2, $3, $4) RETURNING ${COLUMNS}`,
       [crypto.randomUUID(), input.slot_id, input.name, input.email]

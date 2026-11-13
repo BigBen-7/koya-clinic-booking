@@ -4,9 +4,14 @@ const { migrate } = require("./db");
 const { HttpError } = require("./errors");
 const slots = require("./slots");
 const bookings = require("./bookings");
+const { requireKey } = require("./auth");
+const { validateBooking } = require("./validate");
 
 const app = express();
 app.disable("x-powered-by");
+
+// Level 2: the key is checked before anything else, including the JSON body.
+app.use(requireKey);
 app.use(express.json({ limit: "5mb" }));
 
 app.post("/reset", async (req, res) => {
@@ -20,7 +25,8 @@ app.get("/slots", async (req, res) => {
 });
 
 app.post("/bookings", async (req, res) => {
-  const result = await bookings.createBooking(req.body || {});
+  const input = validateBooking(req.body);
+  const result = await bookings.createBooking(input);
   res.status(result.status).json(result.body);
 });
 
@@ -43,6 +49,7 @@ app.use((err, req, res, next) => {
 
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
+  if (!process.env.API_KEY) throw new Error("API_KEY is required");
   await migrate();
   const port = Number(process.env.PORT) || 3000;
   app.listen(port, () => console.log(`listening on ${port}`));

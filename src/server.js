@@ -1,61 +1,40 @@
-// Clinic booking API. Config comes from env vars only: DATABASE_URL, PORT.
+// Clinic booking API + web page. Config comes from env vars only:
+// API_KEY, DATABASE_URL, PORT.
+const path = require("path");
 const express = require("express");
 const { migrate } = require("./db");
 const { HttpError } = require("./errors");
-const slots = require("./slots");
-const bookings = require("./bookings");
 const { requireKey } = require("./auth");
-const { validateBooking, normalizeEmail } = require("./validate");
-const { recordAttempt } = require("./ratelimit");
-
-// Level 4: optional Idempotency-Key header (blank counts as absent).
-function idempotencyKey(req) {
-  const key = (req.get("idempotency-key") || "").trim();
-  if (key.length > 255) throw new HttpError(400, "Idempotency-Key is too long");
-  return key || null;
-}
+const { router } = require("./routes");
 
 const app = express();
 app.disable("x-powered-by");
 
+// --- Web page -------------------------------------------------------------
+// The page is public and never holds the API key. It calls /web/..., and this
+// guard adds the key on the server before the request reaches the API router.
+// Only these four calls are allowed. /reset and the by-email booking list
+// (which would expose other people's bookings) are not reachable from the page.
+const WEB_ALLOWED = [
+  ["GET", /^\/slots$/],
+  ["POST", /^\/bookings$/],
+  ["GET", /^\/bookings\/[^/]+$/],
+  ["DELETE", /^\/bookings\/[^/]+$/],
+];
+
+function webGuard(req, res, next) {
+  const allowed = WEB_ALLOWED.some(([method, pattern]) => method === req.method && pattern.test(req.path));
+  if (!allowed) return next(new HttpError(404, "not found"));
+  req.headers["x-api-key"] = process.env.API_KEY;
+  next();
+}
+
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "index.html")));
+app.use("/web", webGuard, requireKey, router);
+
+// --- The API --------------------------------------------------------------
 // Level 2: the key is checked before anything else, including the JSON body.
-app.use(requireKey);
-app.use(express.json({ limit: "5mb" }));
-
-app.post("/reset", async (req, res) => {
-  await slots.reset(req.body);
-  res.status(200).json({ ok: true });
-});
-
-app.get("/slots", async (req, res) => {
-  const provider = typeof req.query.provider === "string" ? req.query.provider : undefined;
-  res.json({ slots: await slots.listSlots(provider) });
-});
-
-app.post("/bookings", async (req, res) => {
-  // Level 5: every authenticated attempt with a usable email counts, whatever
-  // its outcome, so spam is limited even when the bookings fail. This runs
-  // before validation so the 6th attempt always gets 429.
-  const email = normalizeEmail(req.body && req.body.email);
-  if (email) await recordAttempt(email);
-
-  const input = validateBooking(req.body);
-  const idemKey = idempotencyKey(req);
-  const result = await bookings.createBooking(input, req.body, idemKey);
-  res.status(result.status).json(result.body);
-});
-
-app.get("/bookings", async (req, res) => {
-  res.json(await bookings.listBookings(req.query));
-});
-
-app.get("/bookings/:id", async (req, res) => {
-  res.json(await bookings.getBooking(req.params.id));
-});
-
-app.delete("/bookings/:id", async (req, res) => {
-  res.json(await bookings.cancelBooking(req.params.id));
-});
+app.use(requireKey, router);
 
 app.use((req, res) => res.status(404).json({ error: "not found" }));
 

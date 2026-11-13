@@ -34,6 +34,10 @@ app.get("/bookings/:id", async (req, res) => {
   res.json(await bookings.getBooking(req.params.id));
 });
 
+app.delete("/bookings/:id", async (req, res) => {
+  res.json(await bookings.cancelBooking(req.params.id));
+});
+
 app.use((req, res) => res.status(404).json({ error: "not found" }));
 
 // Every error leaves as { "error": message }.

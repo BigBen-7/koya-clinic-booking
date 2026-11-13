@@ -1,2 +1,34 @@
-node_modules
+# Secrets / env (keep only the example)
 .env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# OS, logs, runtime
+.DS_Store
+*.log
+*.pid
+coverage/
+
+# Local Postgres data and scratch folders
+pgdata/
+postgres-data/
+.pgdata/
+tmp/
+scratch/
+.scratch/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Private working files (not published)
+CLAUDE.md
+.claude/
+TASK.md
+SPEC_NOTES.md
+WALKTHROUGH.md
+DEPLOY.md

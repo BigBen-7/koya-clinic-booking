@@ -5,7 +5,8 @@ const { HttpError } = require("./errors");
 const slots = require("./slots");
 const bookings = require("./bookings");
 const { requireKey } = require("./auth");
-const { validateBooking } = require("./validate");
+const { validateBooking, normalizeEmail } = require("./validate");
+const { recordAttempt } = require("./ratelimit");
 
 // Level 4: optional Idempotency-Key header (blank counts as absent).
 function idempotencyKey(req) {
@@ -32,6 +33,12 @@ app.get("/slots", async (req, res) => {
 });
 
 app.post("/bookings", async (req, res) => {
+  // Level 5: every authenticated attempt with a usable email counts, whatever
+  // its outcome, so spam is limited even when the bookings fail. This runs
+  // before validation so the 6th attempt always gets 429.
+  const email = normalizeEmail(req.body && req.body.email);
+  if (email) await recordAttempt(email);
+
   const input = validateBooking(req.body);
   const idemKey = idempotencyKey(req);
   const result = await bookings.createBooking(input, req.body, idemKey);

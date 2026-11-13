@@ -34,6 +34,7 @@ async function reset(body) {
   const slots = parseSlots(body);
   await tx(async (db) => {
     await db.query("DELETE FROM idempotency_keys");
+    await db.query("DELETE FROM rate_attempts");
     await db.query("DELETE FROM bookings");
     await db.query("DELETE FROM slots");
     if (slots.length > 0) {

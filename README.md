@@ -1,6 +1,6 @@
 # Clinic booking API and web page
 
-Koya Academy Cohort 4, Task 1. An Express + PostgreSQL API that lets patients book appointment slots, and a small web page that uses it. The contract is `SPEC.json` (OpenAPI 3.0.3); `TASK.md` is the task text; `SPEC_NOTES.md` is a readable summary of the spec.
+Koya Academy Cohort 4, Task 1. An Express + PostgreSQL API that lets patients book appointment slots, and a small web page that uses it. The contract is `SPEC.json` (OpenAPI 3.0.3).
 
 All five levels are implemented. `npm run test:e2e` checks every level against a running server.
 
@@ -87,7 +87,7 @@ The rules are enforced by Postgres, not by code that could race.
 
 ## Assumptions
 
-Where `SPEC.json` is explicit, it wins. Where it is silent, this is what I did (the numbering follows the open questions in `SPEC_NOTES.md`).
+Where `SPEC.json` is explicit, it wins. Where it is silent, this is what I did.
 
 **Order of checks and validation**
 1. Order for `POST /bookings`: 401, then rate limit (see 2), then field validation (400), then slot not found (404), then slot already started (400), then conflict (409). Fields are checked in the order `slot_id`, `name`, `email`.
@@ -130,5 +130,3 @@ public/index.html  the web page
 scripts/seed.js    demo slots
 test/e2e.js        end-to-end tests
 ```
-
-See `DEPLOY.md` for the Neon + Render checklist and `WALKTHROUGH.md` for the recording outline.

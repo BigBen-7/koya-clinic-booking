@@ -10,11 +10,12 @@ You need Node 20+ and a PostgreSQL database (local, or a free Neon project).
 
 ```bash
 npm install
-cp .env.example .env        # then edit it, or just export the three variables below
 export API_KEY=choose-a-key
 export DATABASE_URL=postgres://user:password@localhost:5432/clinic
 export PORT=3000
 npm start                   # creates the tables on first start
+# Or keep the values in a git-ignored .env file (copy .env.example) and run:
+#   node --env-file=.env src/server.js
 npm run seed                # optional: demo slots for the web page (replaces all slots)
 ```
 

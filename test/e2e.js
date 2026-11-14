@@ -549,6 +549,83 @@ level("Web page", () => {
 });
 
 // ============================================================================
+// Awkward input must give a clean 4xx JSON error, never a 500, and never leak
+// internals. Each of these returned 500 (or a non-JSON reply) before the fix.
+level("Error handling", () => {
+  const NUL = "\u0000";
+  const cleanError = (r, status, label = "") => {
+    eq(r.status, status, `${label} status`);
+    assert(/json/.test(r.headers.get("content-type") || ""), `${label} reply is JSON`);
+    assert(r.json && typeof r.json.error === "string", `${label} body is { error }`);
+    assert(!/\n\s+at |node_modules|SELECT |INSERT |pg-pool|invalid byte sequence/i.test(r.text), `${label} leaks no internals`);
+  };
+
+  test("a NUL character in name, email or slot_id is a clean 4xx (was 500)", async () => {
+    cleanError(await book(nextSlot(), { name: `A${NUL}B` }), 400, "name");
+    cleanError(await book(nextSlot(), { email: `a${NUL}b@example.com` }), 400, "email");
+    cleanError(await book(`t1${NUL}`), 404, "slot_id");
+  });
+
+  test("a NUL character in a booking id is 404 for GET and DELETE (was 500)", async () => {
+    cleanError(await get(`/bookings/a%00b`), 404, "GET");
+    cleanError(await del(`/bookings/a%00b`), 404, "DELETE");
+  });
+
+  test("a NUL character in ?provider= returns an empty list, and in ?email= is 400 (was 500)", async () => {
+    const r = await get("/slots?provider=a%00b");
+    eq(r.status, 200);
+    eq(r.json.slots, []);
+    cleanError(await get("/bookings?email=a%00b@example.com"), 400, "email query");
+  });
+
+  test("a NUL character in a /reset slot id or provider is 400 and keeps the existing slots (was 500)", async () => {
+    const slot = (extra) => ({ ...mkSlot("n1", "Dr N", at(3, 9)), ...extra });
+    cleanError(await post("/reset", { slots: [slot({ id: `n${NUL}1` })] }), 400, "id");
+    cleanError(await post("/reset", { slots: [slot({ provider: `Dr${NUL}` })] }), 400, "provider");
+    assert((await get("/slots")).json.slots.length > 100, "slots were not wiped by the failed reset");
+  });
+
+  test("a cursor with a NUL id, an impossible date or a non-existent day is 400 (was 500)", async () => {
+    const cursor = (created, id) => Buffer.from(JSON.stringify([created, id])).toString("base64url");
+    const q = (c) => get(`/bookings?email=${encodeURIComponent(email())}&cursor=${c}`);
+    cleanError(await q(cursor("2026-01-01T00:00:00.000000Z", `a${NUL}b`)), 400, "NUL id");
+    cleanError(await q(cursor("9999-99-99T99:99:99.000000Z", "x")), 400, "month 99");
+    cleanError(await q(cursor("2026-02-31T00:00:00.000000Z", "x")), 400, "Feb 31");
+  });
+
+  test("a bad %-escape in the URL is 400 JSON (was 500)", async () => {
+    cleanError(await get("/bookings/%zz"), 400, "bad escape");
+  });
+
+  test("a bad or unknown Content-Encoding is a 4xx JSON error (was 500)", async () => {
+    const withEncoding = (enc) => post("/bookings", { slot_id: nextSlot(), name: "A", email: email() }, { headers: { "Content-Encoding": enc } });
+    cleanError(await withEncoding("bogus"), 415, "unknown encoding");
+    const r = await withEncoding("gzip"); // the body is not actually gzip
+    assert(r.status === 400, `not-gzip body should be 400, got ${r.status}`);
+    assert(r.json && typeof r.json.error === "string", "body is { error }");
+  });
+
+  test("a request header over 16 KB gets a JSON 431 (was an empty reply; checked on localhost only)", async () => {
+    if (!/\/\/(localhost|127\.0\.0\.1)[:/]/.test(BASE_URL + "/")) return; // a hosting proxy would answer first
+    const r = await post("/bookings", { slot_id: "t1", name: "A", email: email() }, { headers: { "Idempotency-Key": "x".repeat(20000) } });
+    cleanError(r, 431, "huge header");
+  });
+
+  test("the key is still checked first for every one of these requests", async () => {
+    const cursor = Buffer.from(JSON.stringify(["9999-99-99T99:99:99.000000Z", "x"])).toString("base64url");
+    const rs = [
+      await get("/bookings/a%00b", { key: null }),
+      await get("/bookings/%zz", { key: null }),
+      await get(`/bookings?email=a@b.co&cursor=${cursor}`, { key: null }),
+      await post("/bookings", { slot_id: "t1", name: `A${NUL}`, email: email() }, { key: null }),
+      await post("/reset", { slots: [{ id: `a${NUL}` }] }, { key: null }),
+      await post("/bookings", { slot_id: "t1", name: "A", email: email() }, { key: null, headers: { "Content-Encoding": "bogus" } }),
+    ];
+    for (const r of rs) eq(r.status, 401, "unauthenticated");
+  });
+});
+
+// ============================================================================
 async function main() {
   console.log(`Testing ${BASE_URL}\n`);
   try {

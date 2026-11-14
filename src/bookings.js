@@ -2,7 +2,7 @@
 const crypto = require("crypto");
 const { pool, tx } = require("./db");
 const { HttpError } = require("./errors");
-const { normalizeEmail } = require("./validate");
+const { normalizeEmail, hasNul } = require("./validate");
 
 // created_at is returned with microseconds so ordering and cursors stay exact.
 const COLUMNS = `id, slot_id, name, email, status,
@@ -52,6 +52,7 @@ async function createBooking(input, rawBody, idemKey) {
         return { status: prior.rows[0].status_code, body: prior.rows[0].response };
       }
     }
+    if (hasNul(input.slot_id)) throw new HttpError(404, "slot not found"); // cannot exist, and Postgres rejects NUL
     const slot = await db.query(
       "SELECT start_at <= clock_timestamp() AS started FROM slots WHERE id = $1",
       [input.slot_id]
@@ -85,6 +86,7 @@ async function createBooking(input, rawBody, idemKey) {
 
 // GET /bookings/{id} (Level 1).
 async function getBooking(id) {
+  if (hasNul(id)) throw new HttpError(404, "booking not found");
   const { rows } = await pool.query(`SELECT ${COLUMNS} FROM bookings WHERE id = $1`, [id]);
   if (rows.length === 0) throw new HttpError(404, "booking not found");
   return toBooking(rows[0]);
@@ -127,12 +129,23 @@ function encodeCursor(created_at, id) {
   return Buffer.from(JSON.stringify([created_at, id])).toString("base64url");
 }
 
+// "YYYY-MM-DDTHH:MM:SS.ffffffZ" that is also a real moment (no month 99, no Feb 31),
+// so Postgres never gets a timestamp it would reject.
+function validTimestamp(text) {
+  const m = typeof text === "string" && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.\d{6}Z$/.exec(text);
+  if (!m) return false;
+  const [y, mo, d, h, mi, s] = m.slice(1).map(Number);
+  const t = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d &&
+         t.getUTCHours() === h && t.getUTCMinutes() === mi && t.getUTCSeconds() === s && y >= 1;
+}
+
 function decodeCursor(cursor) {
   const bad = new HttpError(400, "cursor is not valid");
   if (typeof cursor !== "string" || cursor === "") throw bad;
   try {
     const [created_at, id] = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    if (typeof id !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(created_at)) throw bad;
+    if (typeof id !== "string" || hasNul(id) || !validTimestamp(created_at)) throw bad;
     return { created_at, id };
   } catch {
     throw bad;
@@ -143,6 +156,7 @@ function decodeCursor(cursor) {
 // One conditional UPDATE does the check and the change atomically, so two
 // simultaneous cancels cannot both succeed.
 async function cancelBooking(id) {
+  if (hasNul(id)) throw new HttpError(404, "booking not found");
   const { rows } = await pool.query(
     `UPDATE bookings SET status = 'cancelled' WHERE id = $1 AND status = 'confirmed' RETURNING ${COLUMNS}`,
     [id]

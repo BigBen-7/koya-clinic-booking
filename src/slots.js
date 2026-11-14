@@ -1,6 +1,7 @@
 // Slots: POST /reset (replace all slots) and GET /slots.
 const { pool, tx } = require("./db");
 const { HttpError } = require("./errors");
+const { hasNul } = require("./validate");
 
 // Output format: "2026-12-10T09:00:00Z" (milliseconds only when non-zero).
 function iso(date) {
@@ -21,6 +22,7 @@ function parseSlots(body) {
     for (const f of ["id", "provider", "start", "end"]) {
       if (typeof s[f] !== "string" || s[f].trim() === "") throw bad(`${f} is required`);
     }
+    if (hasNul(s.id) || hasNul(s.provider)) throw bad("id and provider must not contain NUL characters");
     if (!ISO_DATE.test(s.start) || Number.isNaN(Date.parse(s.start))) throw bad("start is not a valid date-time");
     if (!ISO_DATE.test(s.end) || Number.isNaN(Date.parse(s.end))) throw bad("end is not a valid date-time");
     if (seen.has(s.id)) throw bad(`duplicate id ${s.id}`);
@@ -49,6 +51,7 @@ async function reset(body) {
 
 // GET /slots: earliest start first, optional exact-match provider filter.
 async function listSlots(provider) {
+  if (hasNul(provider)) return []; // no provider can have a NUL in its name
   const { rows } = await pool.query(
     `SELECT s.id, s.provider, s.start_at, s.end_at,
             NOT EXISTS (SELECT 1 FROM bookings b WHERE b.slot_id = s.id AND b.status = 'confirmed') AS available

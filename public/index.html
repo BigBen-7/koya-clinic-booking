@@ -56,13 +56,13 @@
     .tab { flex: 0 0 auto; }
   }
 
-  main.wrap { padding-block: 24px 56px; }
-  h2 { font-size: 1.15rem; margin: 0 0 4px; }
-  h3 { font-size: 1rem; margin: 0 0 8px; }
+  main.wrap { padding-block: 28px 64px; }
+  h2 { font-size: 1.2rem; line-height: 1.3; margin: 0 0 6px; }
+  h3 { font-size: 1rem; margin: 0 0 12px; }
   .hint { color: var(--muted); font-size: .9rem; margin: 0; }
 
   /* ---- Controls ---- */
-  label { display: block; font-size: .85rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  label { display: block; font-size: .85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
   input, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
                   background: var(--bg); color: var(--text); font: inherit; }
   input::placeholder { color: var(--muted); opacity: .8; }
@@ -77,16 +77,16 @@
   button:disabled { cursor: not-allowed; opacity: .6; }
   .field-error { color: var(--err-text); font-size: .85rem; margin: 4px 0 0; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-  .stack > * + * { margin-top: 12px; }
+  .stack > * + * { margin-top: 16px; }
 
   .msg { padding: 10px 12px; border-radius: 10px; font-size: .95rem; }
   .msg.error { background: var(--err-bg); color: var(--err-text); border: 1px solid var(--err-line); }
   .msg.info { background: var(--ok-bg); color: var(--ok-text); }
 
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
 
   /* ---- Book tab ---- */
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 12px 0; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 20px 0; }
   .toolbar .grow { flex: 1 1 200px; max-width: 320px; }
   .book { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
   @media (min-width: 900px) {
@@ -94,9 +94,9 @@
     .panel { position: sticky; top: 16px; }
   }
 
-  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; margin: 0 -2px; scroll-snap-type: x proximity;
-           scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  .chip { flex: 0 0 auto; min-width: 92px; text-align: center; line-height: 1.25; border-radius: 12px; scroll-snap-align: start; }
+  /* Day chips wrap onto extra rows instead of scrolling sideways. */
+  .chips { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); margin: 0 0 24px; }
+  .chip { min-width: 0; font-size: .9rem; white-space: nowrap; padding: 8px 4px; text-align: center; line-height: 1.25; border-radius: 12px; }
   .chip small { display: block; color: var(--muted); font-size: .78rem; }
   .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
   .chip[aria-pressed="true"] small { color: var(--accent-text); }
@@ -117,8 +117,8 @@
   .empty { text-align: center; color: var(--muted); padding: 32px 12px; border: 1px dashed var(--line); border-radius: 12px; }
 
   /* ---- Booking panel and result cards ---- */
-  .panel h2 { margin-bottom: 12px; }
-  .chosen { margin: 0 0 12px; padding: 12px; border-radius: 10px; background: var(--ok-bg); color: var(--ok-text); }
+  .panel h2 { margin-bottom: 16px; }
+  .chosen { margin: 0 0 16px; padding: 12px; border-radius: 10px; background: var(--ok-bg); color: var(--ok-text); }
   .chosen b { display: block; font-size: 1.05rem; }
   dl.details { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0 0 12px; }
   dl.details dt { color: var(--muted); }
@@ -131,7 +131,7 @@
   .done-head h2 { margin: 0; }
   .bid { display: block; font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; padding: 12px; margin: 4px 0 8px;
          background: var(--bg); border: 1px dashed var(--accent); border-radius: 10px; overflow-wrap: anywhere; user-select: all; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
   .actions > button { flex: 1 1 auto; }
 
   /* ---- Find tab ---- */
@@ -199,7 +199,7 @@
               <p class="field-error" id="email-err" hidden></p>
             </div>
             <div id="form-error" class="msg error" role="alert" hidden></div>
-            <div class="actions" style="margin-top:0">
+            <div class="actions">
               <button class="primary" id="submit" type="submit">Book this slot</button>
               <button type="button" id="clear" style="flex:0 0 auto">Clear</button>
             </div>

@@ -3,13 +3,18 @@ const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
-// connectionTimeoutMillis: when the database is down, a request fails in 5 s
-// instead of hanging. statement_timeout: a stuck query is cancelled by Postgres.
+// connectionTimeoutMillis: Neon's free database suspends when idle and can take
+// several seconds to wake, so a request waits up to 15 s for a connection. A
+// database that is really down (connection refused) still fails at once.
+// statement_timeout: Postgres cancels a query that runs over 15 s.
+// query_timeout: client-side backstop at 20 s, so nothing can hang forever even
+// if the server stops answering. All of these end in the same 503 JSON.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 15000,
   statement_timeout: 15000,
+  query_timeout: 20000,
 });
 
 // An idle connection can be dropped (database restart, network blip). Without
@@ -27,7 +32,7 @@ function isDbUnavailable(err) {
   if (DOWN_CODES.has(err.code)) return true;
   if (typeof err.code === "string" && err.code.startsWith("08")) return true; // connection exceptions
   if (err.errors && Array.isArray(err.errors)) return err.errors.some(isDbUnavailable); // AggregateError (IPv4+IPv6 both refused)
-  return /timeout exceeded when trying to connect|Connection terminated|Client has encountered a connection error|the database system is (starting up|shutting down)/i.test(err.message || "");
+  return /timeout exceeded when trying to connect|Query read timeout|Connection terminated|Client has encountered a connection error|the database system is (starting up|shutting down)/i.test(err.message || "");
 }
 
 // Run fn(client) inside BEGIN/COMMIT. Any thrown error rolls back and is re-thrown.

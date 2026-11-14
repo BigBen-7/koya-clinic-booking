@@ -114,7 +114,7 @@ Where `SPEC.json` is explicit, it wins. Where it is silent, this is what I did.
 16. Unknown routes return 404 `{"error": "not found"}` (after the 401 check). Request bodies are limited to 5 MB.
 17. The web page and its `/web` routes are public (no key needed); everything else needs the key.
 18. Text containing a NUL character (`\u0000`) cannot be stored in Postgres, so it is rejected with a 4xx, never a 500: 400 in a booking `name`, `email` or a `/reset` slot, 404 for a `slot_id` or booking id (it cannot exist), 400 in a cursor or `email` query, and an empty list for `?provider=`.
-19. If the database is unreachable, requests get `503 {"error": ...}` with `Retry-After: 5` within 5 seconds, and the app recovers by itself when the database returns. At startup the app retries for about a minute before exiting. Any other unexpected error is `500 {"error": "internal server error"}`; details go to the server log only.
+19. If the database is unreachable, requests get `503 {"error": ...}` with `Retry-After: 5`: at once if the connection is refused, after at most 15 seconds if the database is slow to answer (Neon wakes from suspend within that time, so a first request after a quiet spell waits instead of failing), and after 20 seconds for a query that never finishes. The app recovers by itself when the database returns. At startup the app retries for about a minute before exiting. Any other unexpected error is `500 {"error": "internal server error"}`; details go to the server log only.
 
 ## Project layout
 
